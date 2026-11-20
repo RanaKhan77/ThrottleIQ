@@ -1,0 +1,44 @@
+name: gen-l10n-fix
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'branch to fix (rebase onto main + regen l10n)'
+        required: true
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+      - name: rebase onto main
+        run: |
+          git config user.name "l10n-bot"
+          git config user.email "l10n-bot@users.noreply.github.com"
+          git rebase origin/main || { echo "REBASE_CONFLICT"; git rebase --abort; exit 3; }
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.44.9
+          channel: stable
+          cache: true
+      - name: regenerate l10n
+        run: |
+          cd app
+          flutter pub get
+          flutter gen-l10n
+      - name: commit and push regenerated files
+        run: |
+          git add app/lib/l10n/*.dart
+          if [ -n "$(git status --porcelain)" ] && git diff --cached --quiet; then
+            git add -A app/lib/l10n/
+          fi
+          if git diff --cached --quiet; then
+            echo "NOTHING_TO_COMMIT (already fresh)"
+            exit 0
+          fi
+          git commit -m "chore(l10n): regenerate app_localizations after bn ARB review (rebased onto main)"
+          git push --force-with-lease origin HEAD:${{ inputs.branch }}
