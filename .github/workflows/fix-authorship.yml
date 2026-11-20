@@ -1,0 +1,31 @@
+name: fix-authorship
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'branch to squash'
+        required: true
+jobs:
+  squash:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+      - name: squash onto upstream main with the PR author identity
+        run: |
+          set -euo pipefail
+          git config user.name "RanaKhan77"
+          git config user.email "admin@solution9.com"
+          git fetch https://github.com/blankframe-tech/ThrottleIQ.git main
+          BASE="$(git rev-parse FETCH_HEAD)"
+          echo "squashing branch onto upstream main ${BASE:0:8}"
+          git reset --soft "$BASE"
+          if git diff --cached --quiet; then
+            echo "NOTHING_TO_COMMIT"; exit 0
+          fi
+          git commit -m "l10n(bn): native review of the social batch (175 strings, 18 fixes)"                      -m "Native Bengali review of the 175 social-feature strings: 18 corrected (grammar, register, natural phrasing), reviewed strings removed from bn_pending_review.txt. Rebased onto current main and the regenerated app_localizations_bn.dart committed, as app/l10n.yaml requires: re-run flutter gen-l10n after editing an ARB and commit the result."
+          git push --force-with-lease origin HEAD:${{ inputs.branch }}
